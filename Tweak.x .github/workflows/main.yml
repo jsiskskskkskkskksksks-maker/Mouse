@@ -1,58 +1,34 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-// Definições para manipular o sistema de eventos
 typedef struct __IOHIDEvent *IOHIDEventRef;
 extern uint32_t IOHIDEventGetType(IOHIDEventRef event);
 extern float IOHIDEventGetFloatValue(IOHIDEventRef event, uint32_t field);
 
-// Hook para capturar o movimento do mouse
 %hook IOHIDEventSystemClient
 - (void)handleEvent:(IOHIDEventRef)event {
-    if (IOHIDEventGetType(event) == 11) { // 11 = Mouse Move
+    if (IOHIDEventGetType(event) == 11) {
+        float deltaX = IOHIDEventGetFloatValue(event, 0x0B0001);
+        float deltaY = IOHIDEventGetFloatValue(event, 0x0B0002);#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+typedef struct __IOHIDEvent *IOHIDEventRef;
+extern uint32_t IOHIDEventGetType(IOHIDEventRef event);
+extern float IOHIDEventGetFloatValue(IOHIDEventRef event, uint32_t field);
+
+%hook IOHIDEventSystemClient
+- (void)handleEvent:(IOHIDEventRef)event {
+    if (IOHIDEventGetType(event) == 11) {
         float deltaX = IOHIDEventGetFloatValue(event, 0x0B0001);
         float deltaY = IOHIDEventGetFloatValue(event, 0x0B0002);
-        
-        // Aqui o log pra gente ver no PC se tá funcionandoname: Build RawMouse
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup Theos
-        run: |
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
-          echo "THEOS=~/theos" >> $GITHUB_ENV
-
-      - name: Build Tweak
-        run: |
-          export THEOS=~/theos
-          make package FINALPACKAGE=1
-        
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: RawMouse-Package
-          path: packages/*.deb
-
-        NSLog(@"[RawMouse] DeltaX: %f | DeltaY: %f", deltaX, deltaY);
+        NSLog(@"[RawMouse] DX: %f | DY: %f", deltaX, deltaY);
     }
     %orig;
 }
 %end
 
-// --- NOVO: Hook para esconder a bolinha do iPad ---
 %hook BCWindowServerPointerController
-- (void)setGlobalPointerOpacity:(double)arg1 {
-    // Força a opacidade em 0 (invisível) independente do que o sistema queira
-    %orig(0.0);
-}
-%end
-ARCHS = arm64 arm64e
+- (void)setGlobalPointerOpacity:(double)arg1 {ARCHS = arm64 arm64e
 TARGET := iphone:clang:latest:14.0
 INSTALL_TARGET_PROCESSES = backboardd Roblox
 
@@ -61,9 +37,30 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = RawMouse
 RawMouse_FILES = Tweak.x
 RawMouse_CFLAGS = -fobjc-arc
+export BUNDLE_ID = com.jsis.rawmouse
+RawMouse_CODESIGN_FLAGS = -Sentitlements.plist
 
 include $(THEOS_MAKE_PATH)/tweak.mk
-Package: com.jsis.rawmouse
+
+    %orig(0.0);
+}
+%end
+
+        NSLog(@"[RawMouse] DX: %f | DY: %f", deltaX, deltaY);
+    }
+    %orig;
+}
+%end
+
+%hook BCWindowServerPointerController
+- (void)setGlobalPointerOpacity:(double)arg1 {
+    %orig(0.0);
+}
+%end
+ARCHS = arm64 arm64e
+TARGET := iphone:clang:latest:14.0
+INSTALL_TARGET_PROCESSES = backboardd Package: com.jsis.rawmouse
+Name: RawMousePackage: com.jsis.rawmouse
 Name: RawMouse
 Version: 0.1.0
 Architecture: iphoneos-arm64
@@ -71,15 +68,8 @@ Description: Mouse de PC no iPad
 Maintainer: jsis
 Author: jsis
 Section: Tweaks
-Package: com.jsis.rawmouse
-Name: RawMouse
-Version: 0.1.0
-Architecture: iphoneos-arm64
-Description: Raw Input para Mouse no iPad (Estilo PC/Linux)
-Maintainer: jsis
-Author: jsis
-Section: Tweaks
-<?xml version="1.0" encoding="UTF-8"?>
+
+Version: 0.1.0<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -87,65 +77,52 @@ Section: Tweaks
     <true/>
     <key>get-task-allow</key>
     <true/>
-    <key>com.apple.private.external-display-layout</key>
+</dict>
+</plist>name: Build-RawMouse
+on: [push]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Theos
+        run: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          echo "THEOS=~/theos" >> $GITHUB_ENV
+      - name: Compile
+        run: |
+          export THEOS=~/theos
+          make package FINALPACKAGE=1
+      - name: Save
+        uses: actions/upload-artifact@v3
+        with:
+          name: RawMouse-Installer
+          path: packages/*.deb
+
+
+Architecture: iphoneos-arm64
+Description: Mouse de PC no iPad
+Maintainer: jsis
+Author: jsis
+Section: Tweaks
+Roblox<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.developer.hid-event-access</key>
+    <true/>
+    <key>get-task-allow</key>
     <true/>
 </dict>
 </plist>
-# O Bundle ID deve bater com o do arquivo control
-export BUNDLE_ID = com.jsis.rawmouse
 
-# Isso aplica o "Certificado" de permissões durante a compilação
+
+include $(THEOS)/makefiles/common.mk
+
+TWEAK_NAME = RawMouse
+RawMouse_FILES = Tweak.x
+RawMouse_CFLAGS = -fobjc-arc
+export BUNDLE_ID = com.jsis.rawmouse
 RawMouse_CODESIGN_FLAGS = -Sentitlements.plist
 
-# Mantém o processo rodando no fundo
-RawMouse_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
-name: CI
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup Theos
-        run: |
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
-          echo "THEOS=~/theos" >> $GITHUB_ENV
-
-      - name: Build Tweak
-        run: |
-          export THEOS=~/theos
-          make package FINALPACKAGE=1
-        
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: RawMouse-Package
-          path: packages/*.deb
-name: Build RawMouse
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup Theos
-        run: |
-          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
-          echo "THEOS=~/theos" >> $GITHUB_ENV
-
-      - name: Build Tweak
-        run: |
-          export THEOS=~/theos
-          make package FINALPACKAGE=1
-        
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: RawMouse-Package
-          path: packages/*.deb
+include $(THEOS_MAKE_PATH)/tweak.mk
