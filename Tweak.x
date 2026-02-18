@@ -1,0 +1,76 @@
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+
+// Definições para manipular o sistema de eventos
+typedef struct __IOHIDEvent *IOHIDEventRef;
+extern uint32_t IOHIDEventGetType(IOHIDEventRef event);
+extern float IOHIDEventGetFloatValue(IOHIDEventRef event, uint32_t field);
+
+// Hook para capturar o movimento do mouse
+%hook IOHIDEventSystemClient
+- (void)handleEvent:(IOHIDEventRef)event {
+    if (IOHIDEventGetType(event) == 11) { // 11 = Mouse Move
+        float deltaX = IOHIDEventGetFloatValue(event, 0x0B0001);
+        float deltaY = IOHIDEventGetFloatValue(event, 0x0B0002);
+        
+        // Aqui o log pra gente ver no PC se tá funcionando
+        NSLog(@"[RawMouse] DeltaX: %f | DeltaY: %f", deltaX, deltaY);
+    }
+    %orig;
+}
+%end
+
+// --- NOVO: Hook para esconder a bolinha do iPad ---
+%hook BCWindowServerPointerController
+- (void)setGlobalPointerOpacity:(double)arg1 {
+    // Força a opacidade em 0 (invisível) independente do que o sistema queira
+    %orig(0.0);
+}
+%end
+ARCHS = arm64 arm64e
+TARGET := iphone:clang:latest:14.0
+INSTALL_TARGET_PROCESSES = backboardd Roblox
+
+include $(THEOS)/makefiles/common.mk
+
+TWEAK_NAME = RawMouse
+RawMouse_FILES = Tweak.x
+RawMouse_CFLAGS = -fobjc-arc
+
+include $(THEOS_MAKE_PATH)/tweak.mk
+Package: com.jsis.rawmouse
+Name: RawMouse
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Description: Mouse de PC no iPad
+Maintainer: jsis
+Author: jsis
+Section: Tweaks
+Package: com.jsis.rawmouse
+Name: RawMouse
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Description: Raw Input para Mouse no iPad (Estilo PC/Linux)
+Maintainer: jsis
+Author: jsis
+Section: Tweaks
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.developer.hid-event-access</key>
+    <true/>
+    <key>get-task-allow</key>
+    <true/>
+    <key>com.apple.private.external-display-layout</key>
+    <true/>
+</dict>
+</plist>
+# O Bundle ID deve bater com o do arquivo control
+export BUNDLE_ID = com.jsis.rawmouse
+
+# Isso aplica o "Certificado" de permissões durante a compilação
+RawMouse_CODESIGN_FLAGS = -Sentitlements.plist
+
+# Mantém o processo rodando no fundo
+RawMouse_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
