@@ -1,0 +1,25 @@
+name: Build-RawMouse
+on: [push]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Theos
+        run: |
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          echo "THEOS=~/theos" >> $GITHUB_ENV
+
+      - name: Compile
+        run: |
+          export THEOS=~/theos
+          make package FINALPACKAGE=1
+        
+      - name: Save-DEB
+        uses: actions/upload-artifact@v3
+        with:
+          name: RawMouse-Driver
+          path: packages/*.deb
